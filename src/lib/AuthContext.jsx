@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { useDisconnect } from 'wagmi';
 import { api } from '@/api/client';
 
 const AuthContext = createContext();
@@ -8,12 +9,9 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const { disconnect } = useDisconnect();
 
-  useEffect(() => {
-    checkUserAuth();
-  }, []);
-
-  const checkUserAuth = async () => {
+  const checkUserAuth = useCallback(async () => {
     try {
       setIsLoadingAuth(true);
       const currentUser = await api.auth.me();
@@ -26,16 +24,21 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  };
+  }, []);
 
-  const logout = (shouldRedirect = true) => {
+  useEffect(() => {
+    checkUserAuth();
+  }, [checkUserAuth]);
+
+  const logout = useCallback((shouldRedirect = true) => {
     api.auth.logout();
+    disconnect();
     setUser(null);
     setIsAuthenticated(false);
     if (shouldRedirect) {
       window.location.href = '/login';
     }
-  };
+  }, [disconnect]);
 
   const navigateToLogin = () => {
     window.location.href = '/login';
