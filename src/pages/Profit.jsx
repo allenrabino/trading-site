@@ -14,7 +14,7 @@ const timeRanges = ['1W', '1M', 'ALL'];
 
 function buildProfitOverTime(trades) {
   if (!trades.length) return [];
-  const sorted = [...trades].sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+  const sorted = [...trades].sort((a, b) => new Date(a.created_date).getTime() - new Date(b.created_date).getTime());
   let cumulative = 0;
   return sorted.map(trade => {
     const coinData = getCryptoById(trade.coin_id);
@@ -92,8 +92,8 @@ export default function Profit() {
   const filteredChart = chartData.filter(d => {
     const date = new Date(d.date);
     const now = new Date();
-    if (range === '1W') return date >= new Date(now - 7 * 86400000);
-    if (range === '1M') return date >= new Date(now - 30 * 86400000);
+    if (range === '1W') return date >= new Date(now.getTime() - 7 * 86400000);
+    if (range === '1M') return date >= new Date(now.getTime() - 30 * 86400000);
     return true;
   });
 
