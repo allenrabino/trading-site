@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { api } from '@/api/client';
 import { useQuery } from '@tanstack/react-query';
-import { getCryptoById, formatCurrency } from '@/lib/cryptoData';
+import { findCoinById, formatCurrency } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
 import { TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -12,12 +13,12 @@ import { cn } from '@/lib/utils';
 
 const timeRanges = ['1W', '1M', 'ALL'];
 
-function buildProfitOverTime(trades) {
+function buildProfitOverTime(trades, coins) {
   if (!trades.length) return [];
   const sorted = [...trades].sort((a, b) => new Date(a.created_date).getTime() - new Date(b.created_date).getTime());
   let cumulative = 0;
   return sorted.map(trade => {
-    const coinData = getCryptoById(trade.coin_id);
+    const coinData = findCoinById(coins, trade.coin_id);
     const currentPrice = coinData ? coinData.price : trade.price_per_coin;
     const tradePnl = trade.type === 'buy'
       ? (currentPrice - trade.price_per_coin) * trade.amount
@@ -27,7 +28,7 @@ function buildProfitOverTime(trades) {
   });
 }
 
-function buildPerCoinPnl(trades) {
+function buildPerCoinPnl(trades, coins) {
   const map = {};
   trades.filter(t => t.status === 'completed').forEach(trade => {
     if (!map[trade.coin_id]) {
@@ -54,7 +55,7 @@ function buildPerCoinPnl(trades) {
   });
 
   return Object.values(map).map(entry => {
-    const coinData = getCryptoById(entry.coin_id);
+    const coinData = findCoinById(coins, entry.coin_id);
     const currentPrice = coinData ? coinData.price : 0;
     const unrealizedPnl = entry.amountHeld > 0 ? (currentPrice - (entry.costBasis / entry.amountHeld)) * entry.amountHeld : 0;
     const realizedPnl = entry.totalSold - (entry.totalBought - entry.costBasis);
@@ -80,14 +81,15 @@ const CustomTooltip = ({ active, payload }) => {
 
 export default function Profit() {
   const [range, setRange] = useState('ALL');
+  const { coins } = useCryptoList();
 
   const { data: trades = [], isLoading } = useQuery({
     queryKey: ['trades'],
     queryFn: () => api.entities.Trade.list('-created_date', 500),
   });
 
-  const chartData = buildProfitOverTime(trades);
-  const perCoinPnl = buildPerCoinPnl(trades);
+  const chartData = buildProfitOverTime(trades, coins);
+  const perCoinPnl = buildPerCoinPnl(trades, coins);
 
   const filteredChart = chartData.filter(d => {
     const date = new Date(d.date);

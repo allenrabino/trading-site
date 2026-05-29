@@ -1,7 +1,9 @@
 import React from 'react';
 import { api } from '@/api/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getCryptoList, getCryptoById, formatCurrency } from '@/lib/cryptoData';
+import { findCoinById, formatCurrency } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
+import LoadingState from '@/components/LoadingState';
 import { Star, Plus, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,7 +14,7 @@ import { toast } from 'sonner';
 export default function Watchlist() {
   const queryClient = useQueryClient();
   const [addCoinId, setAddCoinId] = React.useState('');
-  const allCoins = getCryptoList();
+  const { coins: allCoins, isLoading: pricesLoading } = useCryptoList();
 
   const { data: watchlist = [], isLoading } = useQuery({
     queryKey: ['watchlist'],
@@ -21,9 +23,9 @@ export default function Watchlist() {
 
   const handleAdd = async () => {
     if (!addCoinId) return;
-    const coin = getCryptoById(addCoinId);
+    const coin = findCoinById(allCoins, addCoinId);
     if (!coin) return;
-    if (watchlist.some(w => w.coin_id === addCoinId)) {
+    if (watchlist.some(w => w.coin_id === addCoinId || w.coin_id === coin.id)) {
       toast.error('Already in watchlist');
       return;
     }
@@ -40,9 +42,13 @@ export default function Watchlist() {
   };
 
   const watchlistCoins = watchlist.map(w => {
-    const coinData = getCryptoById(w.coin_id);
+    const coinData = findCoinById(allCoins, w.coin_id);
     return { ...w, coinData };
   }).filter(w => w.coinData);
+
+  if (pricesLoading && !allCoins.length) {
+    return <LoadingState />;
+  }
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -51,7 +57,6 @@ export default function Watchlist() {
         <p className="text-sm text-muted-foreground mt-1">Track your favorite coins</p>
       </motion.div>
 
-      {/* Add Coin */}
       <div className="flex items-center gap-2">
         <Select value={addCoinId} onValueChange={setAddCoinId}>
           <SelectTrigger className="w-48 bg-secondary/50">
@@ -89,7 +94,7 @@ export default function Watchlist() {
               <div key={item.id} className="bg-card border border-border rounded-xl p-4 group">
                 <div className="flex items-start justify-between mb-3">
                   <Link to={`/trade?coin=${coin.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                    <img src={coin.image} alt={coin.name} className="w-9 h-9 rounded-full bg-secondary p-0.5" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <img src={coin.image} alt={coin.name} className="w-9 h-9 rounded-full bg-secondary p-0.5" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     <div>
                       <h3 className="font-semibold text-sm">{coin.symbol}</h3>
                       <p className="text-xs text-muted-foreground">{coin.name}</p>

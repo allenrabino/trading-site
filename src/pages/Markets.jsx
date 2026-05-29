@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getCryptoList, formatCurrency } from '@/lib/cryptoData';
+import { formatCurrency } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
+import LoadingState from '@/components/LoadingState';
 import { ArrowUpRight, ArrowDownRight, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
 
 export default function Markets() {
-  const coins = getCryptoList();
+  const { coins, isLoading, isError, refetch } = useCryptoList();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('marketCap');
 
@@ -15,11 +17,26 @@ export default function Markets() {
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.symbol.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => b[sortBy] - a[sortBy]);
 
+  if (isLoading && !coins.length) {
+    return <LoadingState />;
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 text-center space-y-3">
+        <p className="text-destructive">Failed to load live market prices.</p>
+        <button onClick={() => refetch()} className="text-sm text-primary hover:underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 lg:p-6 space-y-4">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold">Markets</h1>
-        <p className="text-sm text-muted-foreground mt-1">Live cryptocurrency prices</p>
+        <p className="text-sm text-muted-foreground mt-1">Live cryptocurrency prices · updates every 30s</p>
       </motion.div>
 
       <div className="relative max-w-sm">
@@ -55,7 +72,7 @@ export default function Markets() {
                     <td className="py-3 px-4 text-sm text-muted-foreground">{idx + 1}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <img src={coin.image} alt={coin.name} className="w-7 h-7 rounded-full bg-secondary p-0.5" onError={(e) => { e.target.style.display = 'none'; }} />
+                        <img src={coin.image} alt={coin.name} className="w-7 h-7 rounded-full bg-secondary p-0.5" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                         <div>
                           <p className="font-semibold text-sm">{coin.name}</p>
                           <p className="text-xs text-muted-foreground">{coin.symbol}</p>

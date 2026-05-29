@@ -1,7 +1,8 @@
 import React from 'react';
 import { api } from '@/api/client';
 import { useQuery } from '@tanstack/react-query';
-import { getCryptoById, formatCurrency } from '@/lib/cryptoData';
+import { findCoinById, formatCurrency } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
 import { Wallet, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -10,6 +11,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 const COLORS = ['hsl(199,89%,48%)', 'hsl(152,69%,53%)', 'hsl(43,74%,66%)', 'hsl(270,60%,60%)', 'hsl(0,72%,51%)', 'hsl(180,60%,50%)', 'hsl(30,80%,55%)', 'hsl(300,50%,50%)'];
 
 export default function Portfolio() {
+  const { coins } = useCryptoList();
   const { data: trades = [], isLoading } = useQuery({
     queryKey: ['trades'],
     queryFn: () => api.entities.Trade.list('-created_date', 500),
@@ -33,7 +35,7 @@ export default function Portfolio() {
   const portfolioItems = Object.values(holdings)
     .filter(h => h.amount > 0)
     .map(h => {
-      const coinData = getCryptoById(h.coin_id);
+      const coinData = findCoinById(coins, h.coin_id);
       const currentValue = coinData ? h.amount * coinData.price : 0;
       const pnl = currentValue - h.totalInvested;
       const pnlPercent = h.totalInvested > 0 ? (pnl / h.totalInvested) * 100 : 0;

@@ -1,14 +1,16 @@
 import React from 'react';
 import { X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { formatCurrency } from '@/lib/cryptoData';
-import { getCryptoById } from '@/lib/cryptoData';
+import { findCoinById, formatCurrency } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TradeDetailModal({ trade, onClose }) {
+  const { coins } = useCryptoList();
+
   if (!trade) return null;
 
-  const coinData = getCryptoById(trade.coin_id);
+  const coinData = findCoinById(coins, trade.coin_id);
   const currentPrice = coinData ? coinData.price : trade.price_per_coin;
   const isBuy = trade.type === 'buy';
 

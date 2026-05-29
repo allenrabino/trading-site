@@ -1,8 +1,9 @@
 import React from 'react';
-import { getCryptoList, getCryptoById } from '@/lib/cryptoData';
+import { useCryptoById } from '@/hooks/useCryptoPrices';
 import PriceChart from '@/components/trade/PriceChart';
 import TradeForm from '@/components/trade/TradeForm';
 import CoinInfo from '@/components/trade/CoinInfo';
+import LoadingState from '@/components/LoadingState';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion } from 'framer-motion';
 
@@ -10,9 +11,22 @@ export default function Trade() {
   const urlParams = new URLSearchParams(window.location.search);
   const initialCoin = urlParams.get('coin') || 'bitcoin';
   const [selectedCoinId, setSelectedCoinId] = React.useState(initialCoin);
+  const { coins, coin, isLoading, isError, refetch } = useCryptoById(selectedCoinId);
 
-  const coins = getCryptoList();
-  const coin = getCryptoById(selectedCoinId) || coins[0];
+  if (isLoading && !coin) {
+    return <LoadingState message="Loading live prices..." />;
+  }
+
+  if (isError || !coin) {
+    return (
+      <div className="p-6 text-center space-y-3">
+        <p className="text-destructive">Failed to load live market prices.</p>
+        <button onClick={() => refetch()} className="text-sm text-primary hover:underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 space-y-4">

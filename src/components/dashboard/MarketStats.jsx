@@ -1,13 +1,20 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
-import { getCryptoList, formatCurrency } from '@/lib/cryptoData';
+import { formatCurrency } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
 
 export default function MarketStats() {
-  const coins = getCryptoList();
+  const { coins } = useCryptoList();
+
+  if (!coins.length) return null;
+
   const totalMarketCap = coins.reduce((sum, c) => sum + c.marketCap, 0);
   const totalVolume = coins.reduce((sum, c) => sum + c.volume24h, 0);
   const gainers = coins.filter(c => c.change24h > 0).length;
-  const btcDominance = ((coins[0].marketCap / totalMarketCap) * 100).toFixed(1);
+  const btc = coins.find(c => c.id === 'bitcoin');
+  const btcDominance = btc && totalMarketCap
+    ? ((btc.marketCap / totalMarketCap) * 100).toFixed(1)
+    : '0.0';
 
   const stats = [
     { label: 'Market Cap', value: formatCurrency(totalMarketCap), icon: DollarSign, color: 'text-primary' },

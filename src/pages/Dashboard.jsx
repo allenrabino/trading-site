@@ -1,16 +1,31 @@
 import React from 'react';
-import { getCryptoList } from '@/lib/cryptoData';
+import { useCryptoList } from '@/hooks/useCryptoPrices';
 import PriceCard from '@/components/dashboard/PriceCard';
 import MarketStats from '@/components/dashboard/MarketStats';
+import LoadingState from '@/components/LoadingState';
 import { motion } from 'framer-motion';
 
 export default function Dashboard() {
-  const coins = getCryptoList();
+  const { coins, isLoading, isError, refetch } = useCryptoList();
   const topGainers = [...coins].sort((a, b) => b.change24h - a.change24h).slice(0, 3);
+
+  if (isLoading && !coins.length) {
+    return <LoadingState />;
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 text-center space-y-3">
+        <p className="text-destructive">Failed to load live market prices.</p>
+        <button onClick={() => refetch()} className="text-sm text-primary hover:underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -20,7 +35,6 @@ export default function Dashboard() {
         <p className="text-sm text-muted-foreground mt-1">Market overview & top performers</p>
       </motion.div>
 
-      {/* Market Stats */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -29,7 +43,6 @@ export default function Dashboard() {
         <MarketStats />
       </motion.div>
 
-      {/* Top Gainers */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -43,7 +56,6 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* All Coins */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
