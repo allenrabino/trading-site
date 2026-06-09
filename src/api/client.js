@@ -1,3 +1,5 @@
+import { calculateHoldings, getHoldingAmount, roundAmount, roundValue } from '@/lib/portfolio';
+
 const USERS_KEY = 'trading_users';
 const TOKEN_KEY = 'trading_access_token';
 const PENDING_OTP_KEY = 'trading_pending_otp';
@@ -128,7 +130,7 @@ async function seedStarterBtcHolding(userId) {
   }
 
   const btcPrice = await fetchBtcPrice();
-  const amount = STARTER_BTC_INVESTMENT / btcPrice;
+  const amount = roundAmount(STARTER_BTC_INVESTMENT / btcPrice);
 
   trades.push({
     id: generateId(),
@@ -138,7 +140,7 @@ async function seedStarterBtcHolding(userId) {
     coin_name: 'Bitcoin',
     type: 'buy',
     amount,
-    price_per_coin: btcPrice,
+    price_per_coin: roundValue(btcPrice),
     total_value: STARTER_BTC_INVESTMENT,
     status: 'completed',
   });
@@ -170,18 +172,52 @@ function createEntityStore(prefix) {
       const userId = getCurrentUserId();
       if (!userId) return Promise.reject(new Error('Not authenticated'));
 
-      if (data.type === 'buy') {
-        const balance = getUserBalance(userId);
-        if (data.total_value > balance) {
-          return Promise.reject(new Error('Insufficient balance'));
-        }
-        setUserBalance(userId, balance - data.total_value);
-      } else if (data.type === 'sell') {
-        setUserBalance(userId, getUserBalance(userId) + data.total_value);
-      }
-
       const key = userStorageKey(prefix, userId);
       const items = readJson(key, []);
+
+      if (prefix === 'trading_trades') {
+        const amount = roundAmount(data.amount);
+        const price = roundValue(data.price_per_coin);
+        const totalValue = roundValue(amount * price);
+
+        if (amount <= 0 || price <= 0 || totalValue <= 0) {
+          return Promise.reject(new Error('Invalid trade amount'));
+        }
+
+        if (data.type === 'buy') {
+          const balance = getUserBalance(userId);
+          if (totalValue > balance + 0.01) {
+            return Promise.reject(new Error('Insufficient balance'));
+          }
+          setUserBalance(userId, roundValue(balance - totalValue));
+        } else if (data.type === 'sell') {
+          const holdings = calculateHoldings(items);
+          const held = getHoldingAmount(holdings, data.coin_id);
+          if (amount > held + 0.00000001) {
+            return Promise.reject(new Error('Insufficient holdings'));
+          }
+          setUserBalance(userId, roundValue(getUserBalance(userId) + totalValue));
+        } else {
+          return Promise.reject(new Error('Invalid trade type'));
+        }
+
+        const record = {
+          id: generateId(),
+          created_date: new Date().toISOString(),
+          coin_id: data.coin_id,
+          coin_symbol: data.coin_symbol,
+          coin_name: data.coin_name,
+          type: data.type,
+          amount,
+          price_per_coin: price,
+          total_value: totalValue,
+          status: 'completed',
+        };
+        items.push(record);
+        writeJson(key, items);
+        return Promise.resolve(record);
+      }
+
       const record = {
         id: generateId(),
         created_date: new Date().toISOString(),

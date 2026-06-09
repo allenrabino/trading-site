@@ -3,6 +3,7 @@ import { api } from '@/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { findCoinById, formatCurrency } from '@/lib/cryptoData';
 import { useCryptoList } from '@/hooks/useCryptoPrices';
+import { calculateHoldings, roundValue } from '@/lib/portfolio';
 import { TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -29,41 +30,29 @@ function buildProfitOverTime(trades, coins) {
 }
 
 function buildPerCoinPnl(trades, coins) {
-  const map = {};
-  trades.filter(t => t.status === 'completed').forEach(trade => {
-    if (!map[trade.coin_id]) {
-      map[trade.coin_id] = {
-        coin_id: trade.coin_id,
-        symbol: trade.coin_symbol,
-        name: trade.coin_name,
-        totalBought: 0,
-        totalSold: 0,
-        amountHeld: 0,
-        costBasis: 0,
-      };
-    }
-    const entry = map[trade.coin_id];
-    if (trade.type === 'buy') {
-      entry.totalBought += trade.total_value;
-      entry.amountHeld += trade.amount;
-      entry.costBasis += trade.total_value;
-    } else {
-      entry.totalSold += trade.total_value;
-      entry.amountHeld -= trade.amount;
-      entry.costBasis -= trade.price_per_coin * trade.amount;
-    }
-  });
+  const holdings = calculateHoldings(trades);
 
-  return Object.values(map).map(entry => {
-    const coinData = findCoinById(coins, entry.coin_id);
-    const currentPrice = coinData ? coinData.price : 0;
-    const unrealizedPnl = entry.amountHeld > 0 ? (currentPrice - (entry.costBasis / entry.amountHeld)) * entry.amountHeld : 0;
-    const realizedPnl = entry.totalSold - (entry.totalBought - entry.costBasis);
-    const totalPnl = unrealizedPnl + realizedPnl;
-    const totalInvested = entry.totalBought;
-    const pnlPercent = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
-    return { ...entry, unrealizedPnl, realizedPnl, totalPnl, pnlPercent, coinData };
-  }).sort((a, b) => b.totalPnl - a.totalPnl);
+  return Object.values(holdings)
+    .filter((entry) => entry.amount > 0 || entry.costBasis > 0)
+    .map((entry) => {
+      const coinData = findCoinById(coins, entry.coin_id);
+      const currentPrice = coinData?.price ?? 0;
+      const currentValue = roundValue(entry.amount * currentPrice);
+      const unrealizedPnl = roundValue(currentValue - entry.costBasis);
+      const totalInvested = entry.costBasis;
+      const pnlPercent = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
+
+      return {
+        ...entry,
+        amountHeld: entry.amount,
+        unrealizedPnl,
+        realizedPnl: 0,
+        totalPnl: unrealizedPnl,
+        pnlPercent,
+        coinData,
+      };
+    })
+    .sort((a, b) => b.totalPnl - a.totalPnl);
 }
 
 const CustomTooltip = ({ active, payload }) => {
