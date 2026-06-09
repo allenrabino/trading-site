@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,13 +9,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { calculateHoldings, getHoldingAmount, roundValue } from '@/lib/portfolio';
 
-export default function TradeForm({ coin }) {
-  const [tradeType, setTradeType] = useState('buy');
+export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess }) {
+  const [tradeType, setTradeType] = useState(defaultTradeType);
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   const { user, checkUserAuth } = useAuth();
   const balance = user?.balance ?? 0;
+
+  useEffect(() => {
+    setTradeType(defaultTradeType);
+    setAmount('');
+  }, [defaultTradeType, coin?.id]);
 
   const { data: trades = [] } = useQuery({
     queryKey: ['trades'],
@@ -54,6 +59,7 @@ export default function TradeForm({ coin }) {
       await checkUserAuth();
       toast.success(`${tradeType === 'buy' ? 'Bought' : 'Sold'} ${parsedAmount} ${coin.symbol} for $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
       setAmount('');
+      onSuccess?.();
     } catch (err) {
       toast.error(err.message || 'Trade failed');
     } finally {
@@ -78,7 +84,7 @@ export default function TradeForm({ coin }) {
   );
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
+    <div>
       <h3 className="text-sm font-medium text-muted-foreground mb-1">Trade {coin.symbol}</h3>
       <p className="text-xs text-muted-foreground mb-4">
         {tradeType === 'buy'

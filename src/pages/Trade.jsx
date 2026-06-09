@@ -1,19 +1,22 @@
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import { useCryptoById } from '@/hooks/useCryptoPrices';
 import PriceChart from '@/components/trade/PriceChart';
 import TradeForm from '@/components/trade/TradeForm';
 import LoadingState from '@/components/LoadingState';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion } from 'framer-motion';
 
 export default function Trade() {
-  const tradeFormRef = useRef(null);
+  const [tradeOpen, setTradeOpen] = useState(false);
+  const [tradeType, setTradeType] = useState('buy');
   const urlParams = new URLSearchParams(window.location.search);
   const initialCoin = urlParams.get('coin') || 'bitcoin';
   const [selectedCoinId, setSelectedCoinId] = React.useState(initialCoin);
   const { coins, coin, isLoading, isError, refetch } = useCryptoById(selectedCoinId);
 
-  const scrollToTrade = () => {
-    tradeFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const openTrade = (type = 'buy') => {
+    setTradeType(type);
+    setTradeOpen(true);
   };
 
   if (isLoading && !coin) {
@@ -38,13 +41,19 @@ export default function Trade() {
           coin={coin}
           coins={coins}
           onCoinChange={setSelectedCoinId}
-          onBuy={scrollToTrade}
+          onBuy={() => openTrade('buy')}
         />
       </motion.div>
 
-      <div ref={tradeFormRef}>
-        <TradeForm coin={coin} />
-      </div>
+      <Dialog open={tradeOpen} onOpenChange={setTradeOpen}>
+        <DialogContent className="max-w-[calc(100%-2rem)] rounded-xl p-4 gap-0 border-border bg-card">
+          <TradeForm
+            coin={coin}
+            defaultTradeType={tradeType}
+            onSuccess={() => setTradeOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
