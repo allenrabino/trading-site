@@ -2,9 +2,12 @@ const USERS_KEY = 'trading_users';
 const TOKEN_KEY = 'trading_access_token';
 const PENDING_OTP_KEY = 'trading_pending_otp';
 
+const storage = typeof window !== 'undefined' ? window.localStorage : null;
+
 function readJson(key, fallback) {
+  if (!storage) return fallback;
   try {
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -12,7 +15,8 @@ function readJson(key, fallback) {
 }
 
 function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  if (!storage) return;
+  storage.setItem(key, JSON.stringify(value));
 }
 
 function getUsers() {
@@ -24,7 +28,7 @@ function saveUsers(users) {
 }
 
 function getCurrentUserId() {
-  return localStorage.getItem(TOKEN_KEY);
+  return storage?.getItem(TOKEN_KEY) ?? null;
 }
 
 function userStorageKey(prefix, userId) {
@@ -33,6 +37,24 @@ function userStorageKey(prefix, userId) {
 
 function generateId() {
   return crypto.randomUUID();
+}
+
+function normalizeEmail(email) {
+  if (!email || typeof email !== 'string') {
+    throw new Error('Email is required');
+  }
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) {
+    throw new Error('Email is required');
+  }
+  return normalized;
+}
+
+function findUserByEmail(email) {
+  const normalized = normalizeEmail(email);
+  return getUsers().find(
+    (entry) => entry.email && entry.email.toLowerCase() === normalized
+  );
 }
 
 function sortByCreatedDate(items, sort) {
@@ -86,8 +108,8 @@ const auth = {
       throw error;
     }
     const user = getUsers().find((entry) => entry.id === userId);
-    if (!user) {
-      localStorage.removeItem(TOKEN_KEY);
+    if (!user || !user.email) {
+      storage?.removeItem(TOKEN_KEY);
       const error = new Error('Not authenticated');
       error.status = 401;
       throw error;
@@ -97,28 +119,30 @@ const auth = {
   },
 
   async loginViaEmailPassword(email, password) {
-    const user = getUsers().find(
-      (entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password
-    );
-    if (!user) {
+    if (!password) {
+      throw new Error('Password is required');
+    }
+    const user = findUserByEmail(email);
+    if (!user || user.password !== password) {
       throw new Error('Invalid email or password');
     }
-    localStorage.setItem(TOKEN_KEY, user.id);
+    storage?.setItem(TOKEN_KEY, user.id);
     const { password: _, ...safeUser } = user;
     return safeUser;
   },
 
   async register({ email, password }) {
-    const normalizedEmail = email.toLowerCase();
-    if (getUsers().some((entry) => entry.email.toLowerCase() === normalizedEmail)) {
+    const normalizedEmail = normalizeEmail(email);
+    if (getUsers().some((entry) => entry.email && entry.email.toLowerCase() === normalizedEmail)) {
       throw new Error('An account with this email already exists');
     }
     writeJson(PENDING_OTP_KEY, { email: normalizedEmail, password, otp: '123456' });
   },
 
   async verifyOtp({ email, otpCode }) {
+    const normalizedEmail = normalizeEmail(email);
     const pending = readJson(PENDING_OTP_KEY, null);
-    if (!pending || pending.email !== email.toLowerCase()) {
+    if (!pending || pending.email !== normalizedEmail) {
       throw new Error('Invalid verification code');
     }
     if (otpCode !== pending.otp) {
@@ -135,26 +159,27 @@ const auth = {
     };
     users.push(user);
     saveUsers(users);
-    localStorage.removeItem(PENDING_OTP_KEY);
+    storage?.removeItem(PENDING_OTP_KEY);
 
     const token = user.id;
-    localStorage.setItem(TOKEN_KEY, token);
+    storage?.setItem(TOKEN_KEY, token);
     return { access_token: token };
   },
 
   async resendOtp(email) {
+    const normalizedEmail = normalizeEmail(email);
     const pending = readJson(PENDING_OTP_KEY, null);
-    if (!pending || pending.email !== email.toLowerCase()) {
+    if (!pending || pending.email !== normalizedEmail) {
       throw new Error('No pending verification for this email');
     }
   },
 
   setToken(token) {
-    localStorage.setItem(TOKEN_KEY, token);
+    storage?.setItem(TOKEN_KEY, token);
   },
 
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
+    storage?.removeItem(TOKEN_KEY);
   },
 
   redirectToLogin() {

@@ -14,7 +14,10 @@ export default function Markets() {
   const [sortBy, setSortBy] = useState('marketCap');
 
   const filtered = coins
-    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.symbol.toLowerCase().includes(search.toLowerCase()))
+    .filter(c =>
+      (c.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.symbol ?? '').toLowerCase().includes(search.toLowerCase())
+    )
     .sort((a, b) => b[sortBy] - a[sortBy]);
 
   if (isLoading && !coins.length) {

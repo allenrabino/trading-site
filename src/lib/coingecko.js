@@ -19,8 +19,8 @@ function buildSparklineHistory(prices) {
 function transformMarketCoin(coin) {
   return {
     id: coin.id,
-    symbol: coin.symbol.toUpperCase(),
-    name: coin.name,
+    symbol: (coin.symbol ?? '').toUpperCase(),
+    name: coin.name ?? 'Unknown',
     price: coin.current_price ?? 0,
     change24h: coin.price_change_percentage_24h ?? 0,
     marketCap: coin.market_cap ?? 0,
@@ -40,6 +40,9 @@ export async function fetchCoinMarkets() {
   }
 
   const data = await response.json();
+  if (!Array.isArray(data)) {
+    throw new Error('Failed to fetch live market prices');
+  }
   return data.map(transformMarketCoin);
 }
 
