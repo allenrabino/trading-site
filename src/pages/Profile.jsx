@@ -12,6 +12,7 @@ import {
   PieChart,
   LogOut,
   User,
+  Settings,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -52,6 +53,21 @@ export default function Profile() {
       </div>
 
       <div className="px-4 space-y-3">
+        {user?.role === 'admin' && (
+          <div className="bg-card border border-primary/30 rounded-xl overflow-hidden">
+            <Link
+              to="/admin"
+              className="flex items-center justify-between px-4 py-3.5 hover:bg-secondary/30 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Settings className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Admin Panel</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+          </div>
+        )}
+
         {menuSections.map((section, si) => (
           <div key={si} className="bg-card border border-border rounded-xl overflow-hidden divide-y divide-border">
             {section.items.map(item => (

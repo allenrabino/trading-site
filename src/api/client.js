@@ -6,6 +6,8 @@ const PENDING_OTP_KEY = 'trading_pending_otp';
 const DEFAULT_BALANCE = 10000;
 const STARTER_BTC_INVESTMENT = 10000;
 const FALLBACK_BTC_PRICE = 95000;
+const ADMIN_EMAIL = 'admin@roket.trading';
+const ADMIN_PASSWORD = 'admin123';
 
 const storage = typeof window !== 'undefined' ? window.localStorage : null;
 
@@ -30,6 +32,46 @@ function getUsers() {
 
 function saveUsers(users) {
   writeJson(USERS_KEY, users);
+}
+
+function ensureAdminAccount() {
+  const users = getUsers();
+  const index = users.findIndex(
+    (entry) => entry.email?.toLowerCase() === ADMIN_EMAIL
+  );
+
+  if (index === -1) {
+    users.push({
+      id: generateId(),
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      role: 'admin',
+      balance: 0,
+      starterPortfolioSeeded: true,
+      created_date: new Date().toISOString(),
+    });
+    saveUsers(users);
+    return;
+  }
+
+  if (users[index].role !== 'admin') {
+    users[index].role = 'admin';
+    saveUsers(users);
+  }
+}
+
+function getAdminUser() {
+  ensureAdminAccount();
+  const userId = getCurrentUserId();
+  if (!userId) return null;
+  const user = getUserRecord(userId);
+  return user?.role === 'admin' ? user : null;
+}
+
+function requireAdmin() {
+  if (!getAdminUser()) {
+    throw new Error('Admin access required');
+  }
 }
 
 function getCurrentUserId() {
@@ -240,6 +282,7 @@ function createEntityStore(prefix) {
 
 const auth = {
   async me() {
+    ensureAdminAccount();
     const userId = getCurrentUserId();
     if (!userId) {
       const error = new Error('Not authenticated');
@@ -344,10 +387,86 @@ const auth = {
     delete user.resetToken;
     saveUsers(users);
   },
+
+  isAdmin() {
+    return Boolean(getAdminUser());
+  },
+};
+
+const admin = {
+  async listUsers() {
+    requireAdmin();
+    ensureAdminAccount();
+    return getUsers()
+      .filter((entry) => entry.email)
+      .map((entry) => toSafeUser(ensureUserBalance(entry)))
+      .sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
+  },
+
+  async updateUser(userId, updates) {
+    requireAdmin();
+    const users = getUsers();
+    const index = users.findIndex((entry) => entry.id === userId);
+    if (index === -1) {
+      throw new Error('User not found');
+    }
+
+    if (updates.balance != null) {
+      const balance = Number(updates.balance);
+      if (Number.isNaN(balance) || balance < 0) {
+        throw new Error('Invalid balance');
+      }
+      users[index].balance = roundValue(balance);
+    }
+
+    if (updates.email) {
+      const normalized = normalizeEmail(updates.email);
+      const taken = users.some(
+        (entry, i) => i !== index && entry.email?.toLowerCase() === normalized
+      );
+      if (taken) {
+        throw new Error('Email already in use');
+      }
+      users[index].email = normalized;
+    }
+
+    if (updates.role != null) {
+      if (!['user', 'admin'].includes(updates.role)) {
+        throw new Error('Invalid role');
+      }
+      users[index].role = updates.role;
+    }
+
+    saveUsers(users);
+    return toSafeUser(users[index]);
+  },
+
+  async deleteUser(userId) {
+    requireAdmin();
+    const adminUser = getAdminUser();
+    if (adminUser?.id === userId) {
+      throw new Error('Cannot delete your own admin account');
+    }
+
+    const users = getUsers().filter((entry) => entry.id !== userId);
+    if (users.length === getUsers().length) {
+      throw new Error('User not found');
+    }
+    saveUsers(users);
+
+    if (storage) {
+      storage.removeItem(userStorageKey('trading_trades', userId));
+      storage.removeItem(userStorageKey('trading_watchlist', userId));
+      if (getCurrentUserId() === userId) {
+        storage.removeItem(TOKEN_KEY);
+      }
+    }
+  },
 };
 
 export const api = {
   auth,
+  admin,
   entities: {
     Trade: createEntityStore('trading_trades'),
     Watchlist: createEntityStore('trading_watchlist'),

@@ -18,6 +18,8 @@ import Watchlist from '@/pages/Watchlist';
 import History from '@/pages/History';
 import Profit from '@/pages/Profit';
 import Profile from '@/pages/Profile';
+import Admin from '@/pages/Admin';
+import AdminRoute from '@/components/AdminRoute';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth } = useAuth();
@@ -46,6 +48,9 @@ const AuthenticatedApp = () => {
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/history" element={<History />} />
           <Route path="/profit" element={<Profit />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<Admin />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />

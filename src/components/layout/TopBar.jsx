@@ -12,6 +12,7 @@ const pageTitles = {
   '/watchlist': 'Watchlist',
   '/history': 'History',
   '/profit': 'Profit',
+  '/admin': 'Admin',
 };
 
 export default function TopBar() {
