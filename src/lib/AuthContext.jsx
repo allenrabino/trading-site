@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { api } from '@/api/client';
+import { queryClientInstance } from '@/lib/query-client';
 
 const AuthContext = createContext();
 
@@ -15,6 +16,7 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await api.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
+      queryClientInstance.invalidateQueries({ queryKey: ['trades'] });
     } catch {
       setUser(null);
       setIsAuthenticated(false);

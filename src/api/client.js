@@ -2,6 +2,8 @@ const USERS_KEY = 'trading_users';
 const TOKEN_KEY = 'trading_access_token';
 const PENDING_OTP_KEY = 'trading_pending_otp';
 const DEFAULT_BALANCE = 10000;
+const STARTER_BTC_INVESTMENT = 10000;
+const FALLBACK_BTC_PRICE = 95000;
 
 const storage = typeof window !== 'undefined' ? window.localStorage : null;
 
@@ -100,6 +102,53 @@ function toSafeUser(user) {
   return { ...safeUser, balance: getUserBalance(user.id) };
 }
 
+async function fetchBtcPrice() {
+  try {
+    const response = await fetch('/api/crypto/markets');
+    if (!response.ok) return FALLBACK_BTC_PRICE;
+    const data = await response.json();
+    const btc = data.find((coin) => coin.id === 'bitcoin');
+    return btc?.current_price ?? FALLBACK_BTC_PRICE;
+  } catch {
+    return FALLBACK_BTC_PRICE;
+  }
+}
+
+async function seedStarterBtcHolding(userId) {
+  const users = getUsers();
+  const userIndex = users.findIndex((entry) => entry.id === userId);
+  if (userIndex === -1 || users[userIndex].starterPortfolioSeeded) return;
+
+  const tradesKey = userStorageKey('trading_trades', userId);
+  const trades = readJson(tradesKey, []);
+  if (trades.length > 0) {
+    users[userIndex].starterPortfolioSeeded = true;
+    saveUsers(users);
+    return;
+  }
+
+  const btcPrice = await fetchBtcPrice();
+  const amount = STARTER_BTC_INVESTMENT / btcPrice;
+
+  trades.push({
+    id: generateId(),
+    created_date: new Date().toISOString(),
+    coin_id: 'bitcoin',
+    coin_symbol: 'BTC',
+    coin_name: 'Bitcoin',
+    type: 'buy',
+    amount,
+    price_per_coin: btcPrice,
+    total_value: STARTER_BTC_INVESTMENT,
+    status: 'completed',
+  });
+
+  writeJson(tradesKey, trades);
+  users[userIndex].balance = Math.max(0, getUserBalance(userId) - STARTER_BTC_INVESTMENT);
+  users[userIndex].starterPortfolioSeeded = true;
+  saveUsers(users);
+}
+
 function sortByCreatedDate(items, sort) {
   const descending = sort?.startsWith('-');
   return [...items].sort((a, b) => {
@@ -161,6 +210,7 @@ const auth = {
       error.status = 401;
       throw error;
     }
+    await seedStarterBtcHolding(userId);
     const user = getUsers().find((entry) => entry.id === userId);
     if (!user || !user.email) {
       storage?.removeItem(TOKEN_KEY);
@@ -180,7 +230,8 @@ const auth = {
       throw new Error('Invalid email or password');
     }
     storage?.setItem(TOKEN_KEY, user.id);
-    return toSafeUser(ensureUserBalance(user));
+    await seedStarterBtcHolding(user.id);
+    return toSafeUser(ensureUserBalance(getUserRecord(user.id)));
   },
 
   async register({ email, password }) {
@@ -216,6 +267,7 @@ const auth = {
 
     const token = user.id;
     storage?.setItem(TOKEN_KEY, token);
+    await seedStarterBtcHolding(user.id);
     return { access_token: token };
   },
 
