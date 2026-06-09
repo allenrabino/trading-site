@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useCryptoById } from '@/hooks/useCryptoPrices';
 import PriceChart from '@/components/trade/PriceChart';
 import TradeForm from '@/components/trade/TradeForm';
@@ -10,7 +10,6 @@ import { motion } from 'framer-motion';
 export default function Trade() {
   const [tradeOpen, setTradeOpen] = useState(false);
   const [tradeType, setTradeType] = useState('buy');
-  const [tradePhase, setTradePhase] = useState('form');
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const urlParams = new URLSearchParams(window.location.search);
   const initialCoin = urlParams.get('coin') || 'bitcoin';
@@ -19,18 +18,11 @@ export default function Trade() {
 
   const openTrade = (type = 'buy') => {
     setTradeType(type);
-    setTradePhase('form');
     setTradeOpen(true);
   };
 
-  const handlePhaseChange = useCallback((phase) => {
-    setTradePhase(phase);
-  }, []);
-
   const handleModalChange = (open) => {
-    if (!open && tradePhase === 'countdown') return;
     setTradeOpen(open);
-    if (!open) setTradePhase('form');
   };
 
   if (isLoading && !coin) {
@@ -60,16 +52,11 @@ export default function Trade() {
       </motion.div>
 
       <Dialog open={tradeOpen} onOpenChange={handleModalChange}>
-        <DialogContent
-          className="max-w-[calc(100%-2rem)] rounded-xl p-4 gap-0 border-border bg-card"
-          onPointerDownOutside={(e) => tradePhase === 'countdown' && e.preventDefault()}
-          onEscapeKeyDown={(e) => tradePhase === 'countdown' && e.preventDefault()}
-        >
+        <DialogContent className="max-w-[calc(100%-2rem)] rounded-xl p-4 gap-0 border-border bg-card">
           <TradeForm
             coin={coin}
             defaultTradeType={tradeType}
             onSuccess={() => setTradeOpen(false)}
-            onPhaseChange={handlePhaseChange}
             onTradeUpdate={() => setHistoryRefreshKey((k) => k + 1)}
             refetchPrice={refetch}
           />
@@ -79,6 +66,7 @@ export default function Trade() {
       <CoinTradeHistory
         coinId={coin.id}
         coinSymbol={coin.symbol}
+        currentPrice={coin.price}
         refreshKey={historyRefreshKey}
       />
     </div>

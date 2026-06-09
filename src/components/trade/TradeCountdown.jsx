@@ -1,16 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/api/client';
 import { formatCurrency } from '@/lib/cryptoData';
 import { formatChartPrice } from '@/lib/chartUtils';
+import { formatRemaining } from '@/lib/tradeDuration';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
-
-function formatTime(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
 
 export default function TradeCountdown({
   contract,
@@ -24,6 +19,7 @@ export default function TradeCountdown({
   );
   const [settling, setSettling] = useState(false);
   const [result, setResult] = useState(null);
+  const settledRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -31,41 +27,40 @@ export default function TradeCountdown({
   const livePnl = contract.total_value * (currentPrice / contract.entry_price - 1);
   const isLiveProfit = livePnl >= 0;
 
+  const settle = useCallback(async () => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    setSettling(true);
+    try {
+      let exitPrice = coin?.price ?? contract.entry_price;
+      if (refetchPrice) {
+        const refreshed = await refetchPrice();
+        const updated = refreshed?.data?.find?.((c) => c.id === contract.coin_id);
+        if (updated?.price) exitPrice = updated.price;
+      }
+      const settlement = await api.trading.completeTimedBuy(contract, exitPrice);
+      setResult(settlement);
+      onCompleteRef.current?.(settlement);
+    } catch (err) {
+      settledRef.current = false;
+      setResult({
+        pnl: 0,
+        exitPrice: contract.entry_price,
+        isProfit: false,
+        total_value: contract.total_value,
+        entry_price: contract.entry_price,
+        changePct: 0,
+        error: err.message,
+      });
+    } finally {
+      setSettling(false);
+    }
+  }, [coin, contract, refetchPrice]);
+
   useEffect(() => {
     if (result) return undefined;
 
-    let settled = false;
     let interval;
-
-    const settle = async () => {
-      if (settled) return;
-      settled = true;
-      if (interval) clearInterval(interval);
-      setSettling(true);
-      try {
-        let exitPrice = coin?.price ?? contract.entry_price;
-        if (refetchPrice) {
-          const refreshed = await refetchPrice();
-          const updated = refreshed?.data?.find?.((c) => c.id === contract.coin_id);
-          if (updated?.price) exitPrice = updated.price;
-        }
-        const settlement = await api.trading.completeTimedBuy(contract, exitPrice);
-        setResult(settlement);
-        onCompleteRef.current?.(settlement);
-      } catch (err) {
-        setResult({
-          pnl: 0,
-          exitPrice: contract.entry_price,
-          isProfit: false,
-          total_value: contract.total_value,
-          entry_price: contract.entry_price,
-          changePct: 0,
-          error: err.message,
-        });
-      } finally {
-        setSettling(false);
-      }
-    };
 
     const tick = () => {
       const left = Math.max(0, Math.ceil((contract.ends_at - Date.now()) / 1000));
@@ -76,11 +71,12 @@ export default function TradeCountdown({
     };
 
     tick();
-    interval = setInterval(tick, 250);
+    const intervalMs = contract.duration_sec > 3600 ? 1000 : 250;
+    interval = setInterval(tick, intervalMs);
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [contract.id, contract.ends_at, result]);
+  }, [contract.id, contract.ends_at, result, settle]);
 
   if (result) {
     return (
@@ -144,6 +140,7 @@ export default function TradeCountdown({
   }
 
   const progress = 1 - remaining / contract.duration_sec;
+  const isLongDuration = contract.duration_sec > 3600;
 
   return (
     <div className="text-center py-2">
@@ -173,7 +170,14 @@ export default function TradeCountdown({
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           ) : (
             <>
-              <span className="text-3xl font-bold font-mono tabular-nums">{formatTime(remaining)}</span>
+              <span
+                className={cn(
+                  'font-bold font-mono tabular-nums px-1 text-center leading-tight',
+                  isLongDuration ? 'text-sm' : 'text-3xl'
+                )}
+              >
+                {formatRemaining(remaining)}
+              </span>
               <span className="text-[10px] text-muted-foreground mt-1">remaining</span>
             </>
           )}
@@ -198,9 +202,19 @@ export default function TradeCountdown({
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Result settles when the countdown ends
+      <p className="text-xs text-muted-foreground mb-3">
+        Result settles when the countdown ends, or sell now at the current price
       </p>
+
+      <Button
+        type="button"
+        variant="destructive"
+        className="w-full h-10 font-semibold text-sm"
+        disabled={settling}
+        onClick={settle}
+      >
+        {settling ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sell now'}
+      </Button>
     </div>
   );
 }

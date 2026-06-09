@@ -464,18 +464,21 @@ const admin = {
   },
 };
 
-export const TRADE_COUNTDOWN_SECONDS = 60;
+export const TRADE_COUNTDOWN_SECONDS = 7 * 24 * 60 * 60;
 
 const trading = {
-  async startTimedBuy({ coin_id, coin_symbol, coin_name, amount, entry_price }) {
+  async startTimedBuy({ coin_id, coin_symbol, coin_name, amount, entry_price, duration_sec }) {
     const userId = getCurrentUserId();
     if (!userId) throw new Error('Not authenticated');
 
     const amountRounded = roundAmount(amount);
     const entryPrice = roundValue(entry_price);
     const totalValue = roundValue(amountRounded * entryPrice);
+    const durationSec = duration_sec ?? TRADE_COUNTDOWN_SECONDS;
 
     if (totalValue <= 0) throw new Error('Invalid trade amount');
+    if (durationSec < 60) throw new Error('Minimum duration is 1 minute');
+    if (durationSec > 365 * 24 * 60 * 60) throw new Error('Maximum duration is 365 days');
 
     const balance = getUserBalance(userId);
     if (totalValue > balance + 0.01) {
@@ -498,7 +501,7 @@ const trading = {
       price_per_coin: entryPrice,
       total_value: totalValue,
       timed: true,
-      duration_sec: TRADE_COUNTDOWN_SECONDS,
+      duration_sec: durationSec,
       status: 'pending',
     });
     writeJson(tradesKey, trades);
@@ -511,8 +514,8 @@ const trading = {
       amount: amountRounded,
       entry_price: entryPrice,
       total_value: totalValue,
-      duration_sec: TRADE_COUNTDOWN_SECONDS,
-      ends_at: Date.now() + TRADE_COUNTDOWN_SECONDS * 1000,
+      duration_sec: durationSec,
+      ends_at: Date.now() + durationSec * 1000,
     };
   },
 
@@ -569,6 +572,34 @@ const trading = {
       entry_price,
       changePct,
     };
+  },
+
+  async earlyExitTimedBuy(tradeId, exit_price) {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error('Not authenticated');
+
+    const tradesKey = userStorageKey('trading_trades', userId);
+    const trades = readJson(tradesKey, []);
+    const trade = trades.find((entry) => entry.id === tradeId);
+
+    if (!trade) throw new Error('Trade not found');
+    if (trade.status !== 'pending') throw new Error('Trade is not active');
+    if (!trade.timed || trade.type !== 'buy') throw new Error('Only active buy trades can be sold');
+
+    const durationSec = trade.duration_sec ?? TRADE_COUNTDOWN_SECONDS;
+    const contract = {
+      id: trade.id,
+      coin_id: trade.coin_id,
+      coin_symbol: trade.coin_symbol,
+      coin_name: trade.coin_name,
+      amount: trade.amount,
+      entry_price: trade.price_per_coin,
+      total_value: trade.total_value,
+      duration_sec: durationSec,
+      ends_at: new Date(trade.created_date).getTime() + durationSec * 1000,
+    };
+
+    return this.completeTimedBuy(contract, exit_price);
   },
 };
 

@@ -1,12 +1,19 @@
-import React from 'react';
-import { X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
 import { findCoinById, formatCurrency } from '@/lib/cryptoData';
 import { useCryptoList } from '@/hooks/useCryptoPrices';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '@/api/client';
+import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
-export default function TradeDetailModal({ trade, onClose }) {
+export default function TradeDetailModal({ trade, onClose, onTradeUpdate }) {
   const { coins } = useCryptoList();
+  const [selling, setSelling] = useState(false);
+  const queryClient = useQueryClient();
+  const { checkUserAuth } = useAuth();
 
   if (!trade) return null;
 
@@ -24,6 +31,27 @@ export default function TradeDetailModal({ trade, onClose }) {
     : '0.00';
   const isProfit = profit >= 0;
   const exitPrice = trade.exit_price ?? currentPrice;
+  const isPending = trade.status === 'pending' && trade.timed;
+
+  const handleEarlySell = async () => {
+    setSelling(true);
+    try {
+      const result = await api.trading.earlyExitTimedBuy(trade.id, currentPrice);
+      await queryClient.refetchQueries({ queryKey: ['trades'] });
+      await checkUserAuth();
+      onTradeUpdate?.();
+      toast.success(
+        result.isProfit
+          ? `Sold for +${formatCurrency(result.pnl)} profit`
+          : `Sold for -${formatCurrency(Math.abs(result.pnl))} loss`
+      );
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Failed to sell');
+    } finally {
+      setSelling(false);
+    }
+  };
 
   // Simulated fee (0.1%)
   const fee = trade.total_value * 0.001;
@@ -97,13 +125,23 @@ export default function TradeDetailModal({ trade, onClose }) {
 
           {/* Complete Button */}
           <div className="px-5 py-5 mt-3">
-            <button
-              onClick={onClose}
-              className="w-full py-3 rounded-xl text-sm font-semibold text-black transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(90deg, hsl(180,100%,60%), hsl(199,89%,55%))' }}
-            >
-              Complete
-            </button>
+            {isPending ? (
+              <button
+                onClick={handleEarlySell}
+                disabled={selling}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-destructive-foreground bg-destructive transition-opacity hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {selling ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sell now'}
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-black transition-opacity hover:opacity-90"
+                style={{ background: 'linear-gradient(90deg, hsl(180,100%,60%), hsl(199,89%,55%))' }}
+              >
+                Complete
+              </button>
+            )}
           </div>
         </motion.div>
       </div>
