@@ -1,5 +1,6 @@
 const USERS_KEY = 'trading_users';
 const TOKEN_KEY = 'trading_access_token';
+const PENDING_OTP_KEY = 'trading_pending_otp';
 
 function readJson(key, fallback) {
   try {
@@ -91,31 +92,65 @@ const auth = {
       error.status = 401;
       throw error;
     }
-    return user;
+    const { password: _, ...safeUser } = user;
+    return safeUser;
   },
 
-  async connectWallet(address) {
-    if (!address) {
-      throw new Error('Wallet address is required');
-    }
-
-    const normalized = address.toLowerCase();
-    const users = getUsers();
-    let user = users.find((entry) => entry.walletAddress?.toLowerCase() === normalized);
-
+  async loginViaEmailPassword(email, password) {
+    const user = getUsers().find(
+      (entry) => entry.email.toLowerCase() === email.toLowerCase() && entry.password === password
+    );
     if (!user) {
-      user = {
-        id: generateId(),
-        walletAddress: normalized,
-        role: 'user',
-        created_date: new Date().toISOString(),
-      };
-      users.push(user);
-      saveUsers(users);
+      throw new Error('Invalid email or password');
+    }
+    localStorage.setItem(TOKEN_KEY, user.id);
+    const { password: _, ...safeUser } = user;
+    return safeUser;
+  },
+
+  async register({ email, password }) {
+    const normalizedEmail = email.toLowerCase();
+    if (getUsers().some((entry) => entry.email.toLowerCase() === normalizedEmail)) {
+      throw new Error('An account with this email already exists');
+    }
+    writeJson(PENDING_OTP_KEY, { email: normalizedEmail, password, otp: '123456' });
+  },
+
+  async verifyOtp({ email, otpCode }) {
+    const pending = readJson(PENDING_OTP_KEY, null);
+    if (!pending || pending.email !== email.toLowerCase()) {
+      throw new Error('Invalid verification code');
+    }
+    if (otpCode !== pending.otp) {
+      throw new Error('Invalid verification code');
     }
 
-    localStorage.setItem(TOKEN_KEY, user.id);
-    return user;
+    const users = getUsers();
+    const user = {
+      id: generateId(),
+      email: pending.email,
+      password: pending.password,
+      role: 'user',
+      created_date: new Date().toISOString(),
+    };
+    users.push(user);
+    saveUsers(users);
+    localStorage.removeItem(PENDING_OTP_KEY);
+
+    const token = user.id;
+    localStorage.setItem(TOKEN_KEY, token);
+    return { access_token: token };
+  },
+
+  async resendOtp(email) {
+    const pending = readJson(PENDING_OTP_KEY, null);
+    if (!pending || pending.email !== email.toLowerCase()) {
+      throw new Error('No pending verification for this email');
+    }
+  },
+
+  setToken(token) {
+    localStorage.setItem(TOKEN_KEY, token);
   },
 
   logout() {
@@ -124,6 +159,24 @@ const auth = {
 
   redirectToLogin() {
     window.location.href = '/login';
+  },
+
+  async resetPasswordRequest(_email) {
+    return { success: true };
+  },
+
+  async resetPassword({ resetToken, newPassword }) {
+    if (!resetToken) {
+      throw new Error('Invalid reset token');
+    }
+    const users = getUsers();
+    const user = users.find((entry) => entry.resetToken === resetToken);
+    if (!user) {
+      throw new Error('Invalid or expired reset token');
+    }
+    user.password = newPassword;
+    delete user.resetToken;
+    saveUsers(users);
   },
 };
 

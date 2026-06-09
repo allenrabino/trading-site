@@ -1,12 +1,8 @@
 import React from 'react';
-import { Bell, Search, TrendingUp, Wallet, LogOut } from 'lucide-react';
+import { Bell, Search, TrendingUp, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
-
-function formatAddress(address) {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
 
 export default function TopBar() {
   const { user, logout } = useAuth();
@@ -36,10 +32,10 @@ export default function TopBar() {
           <span className="text-xs font-medium text-accent">Live</span>
         </div>
 
-        {user?.walletAddress && (
+        {user?.email && (
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 border border-border">
-            <Wallet className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-mono font-medium">{formatAddress(user.walletAddress)}</span>
+            <User className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-medium truncate max-w-[140px]">{user.email}</span>
           </div>
         )}
 
@@ -48,7 +44,7 @@ export default function TopBar() {
           size="icon"
           className="h-9 w-9 text-muted-foreground"
           onClick={() => logout()}
-          title="Disconnect wallet"
+          title="Log out"
         >
           <LogOut className="w-4 h-4" />
         </Button>
