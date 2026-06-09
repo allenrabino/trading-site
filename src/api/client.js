@@ -1,10 +1,7 @@
 const USERS_KEY = 'trading_users';
 const TOKEN_KEY = 'trading_access_token';
 const PENDING_OTP_KEY = 'trading_pending_otp';
-const DEFAULT_BALANCE = 100000;
-const USER_BALANCES = {
-  'letty2026ss@gmail.com': 10000,
-};
+const DEFAULT_BALANCE = 10000;
 
 const storage = typeof window !== 'undefined' ? window.localStorage : null;
 
@@ -61,8 +58,8 @@ function findUserByEmail(email) {
   );
 }
 
-function getInitialBalance(email) {
-  return USER_BALANCES[email.toLowerCase()] ?? DEFAULT_BALANCE;
+function getInitialBalance() {
+  return DEFAULT_BALANCE;
 }
 
 function getUserRecord(userId) {
@@ -72,7 +69,7 @@ function getUserRecord(userId) {
 function getUserBalance(userId) {
   const user = getUserRecord(userId);
   if (!user) return 0;
-  if (user.balance == null) return getInitialBalance(user.email ?? '');
+  if (user.balance == null) return getInitialBalance();
   return user.balance;
 }
 
@@ -90,7 +87,7 @@ function ensureUserBalance(user) {
   if (index === -1) return user;
 
   if (users[index].balance == null) {
-    users[index].balance = getInitialBalance(users[index].email);
+    users[index].balance = getInitialBalance();
     saveUsers(users);
     return { ...users[index], password: undefined };
   }
@@ -210,7 +207,7 @@ const auth = {
       email: pending.email,
       password: pending.password,
       role: 'user',
-      balance: getInitialBalance(pending.email),
+      balance: getInitialBalance(),
       created_date: new Date().toISOString(),
     };
     users.push(user);
