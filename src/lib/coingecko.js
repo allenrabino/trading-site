@@ -1,5 +1,3 @@
-import { COIN_IDS } from './cryptoData';
-
 const API_BASE = '/api/crypto';
 
 function buildSparklineHistory(prices) {
@@ -60,10 +58,16 @@ export async function fetchCoinMarketChart(coinId, days) {
   const response = await fetch(`${API_BASE}/chart?${params}`);
   const data = await parseApiResponse(response, 'Failed to fetch price history');
 
-  return (data.prices ?? []).map(([timestamp, price]) => ({
-    time: new Date(timestamp).toISOString(),
-    price,
-  }));
+  return {
+    prices: (data.prices ?? []).map(([timestamp, price]) => ({
+      time: timestamp,
+      price,
+    })),
+    volumes: (data.total_volumes ?? []).map(([timestamp, volume]) => ({
+      time: timestamp,
+      volume,
+    })),
+  };
 }
 
 export const CHART_DAYS = {

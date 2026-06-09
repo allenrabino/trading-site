@@ -1,16 +1,9 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
-
-const COINGECKO_MARKETS_PATH =
-  '/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,binancecoin,solana,ripple,cardano,avalanche-2,dogecoin,polkadot,chainlink&order=market_cap_desc&sparkline=true&price_change_percentage=24h';
+import { fetchTopMarkets } from './api/crypto/_shared.js'
 
 const cryptoProxy = {
-  '/api/crypto/markets': {
-    target: 'https://api.coingecko.com',
-    changeOrigin: true,
-    rewrite: () => COINGECKO_MARKETS_PATH,
-  },
   '/api/crypto/chart': {
     target: 'https://api.coingecko.com',
     changeOrigin: true,
@@ -24,6 +17,32 @@ const cryptoProxy = {
     },
   },
 };
+
+function cryptoMarketsApiPlugin() {
+  return {
+    name: 'crypto-markets-api',
+    configureServer(server) {
+      server.middlewares.use('/api/crypto/markets', async (req, res) => {
+        if (req.method !== 'GET') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method not allowed' }));
+          return;
+        }
+
+        try {
+          const data = await fetchTopMarkets();
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.end(JSON.stringify(data));
+        } catch (error) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: error.message || 'Failed to fetch market prices' }));
+        }
+      });
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -43,5 +62,5 @@ export default defineConfig({
     },
   },
 
-  plugins: [react()],
+  plugins: [react(), cryptoMarketsApiPlugin()],
 })

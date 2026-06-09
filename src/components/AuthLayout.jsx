@@ -1,22 +1,33 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
-export default function AuthLayout({ icon: Icon, title, subtitle, footer = null, children }) {
+export default function AuthLayout({ title, subtitle, footer = null, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4">
-            <Icon className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
+    <div className="min-h-screen bg-black flex justify-center">
+      <div className="app-shell min-h-screen flex flex-col">
+        <div className="flex items-center justify-center pt-12 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl primary-gradient flex items-center justify-center shadow-lg">
+              <span className="text-xl font-bold text-primary-foreground">R</span>
+            </div>
+            <span className="text-2xl font-bold tracking-tight">Roket Trading</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-          {subtitle && <p className="text-muted-foreground mt-2">{subtitle}</p>}
         </div>
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-          {children}
+
+        <div className="flex-1 px-4 pb-8">
+          <div className="text-center mb-6">
+            <h1 className="text-xl font-bold text-foreground">{title}</h1>
+            {subtitle && <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>}
+          </div>
+
+          <div className="bg-card rounded-xl border border-border p-5">
+            {children}
+          </div>
+
+          {footer && (
+            <p className="text-center text-sm text-muted-foreground mt-5">{footer}</p>
+          )}
         </div>
-        {footer && (
-          <p className="text-center text-sm text-muted-foreground mt-6">{footer}</p>
-        )}
       </div>
     </div>
   );

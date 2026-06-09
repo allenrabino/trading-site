@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchCoinMarkets, fetchCoinMarketChart } from '@/lib/coingecko';
+import { CHART_TIMEFRAMES } from '@/lib/chartUtils';
 import { findCoinById } from '@/lib/cryptoData';
 
 const REFETCH_INTERVAL = 30_000;
@@ -32,12 +33,12 @@ export function useCryptoById(coinId) {
   };
 }
 
-export function useCoinChart(coinId, range) {
-  const days = range === '1D' ? 1 : range === '1M' ? 30 : 7;
+export function useCoinChart(coinId, timeframe = '5m') {
+  const config = CHART_TIMEFRAMES[timeframe] ?? CHART_TIMEFRAMES['5m'];
 
   return useQuery({
-    queryKey: ['coin-chart', coinId, days],
-    queryFn: () => fetchCoinMarketChart(coinId, days),
+    queryKey: ['coin-chart', coinId, config.days, timeframe],
+    queryFn: () => fetchCoinMarketChart(coinId, config.days),
     enabled: Boolean(coinId),
     staleTime: 60_000,
   });

@@ -17,6 +17,7 @@ import Portfolio from '@/pages/Portfolio';
 import Watchlist from '@/pages/Watchlist';
 import History from '@/pages/History';
 import Profit from '@/pages/Profit';
+import Profile from '@/pages/Profile';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth } = useAuth();
@@ -41,6 +42,7 @@ const AuthenticatedApp = () => {
           <Route path="/markets" element={<Markets />} />
           <Route path="/trade" element={<Trade />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/history" element={<History />} />
           <Route path="/profit" element={<Profit />} />

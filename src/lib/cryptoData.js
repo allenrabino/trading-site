@@ -1,15 +1,4 @@
-export const COIN_IDS = [
-  'bitcoin',
-  'ethereum',
-  'binancecoin',
-  'solana',
-  'ripple',
-  'cardano',
-  'avalanche-2',
-  'dogecoin',
-  'polkadot',
-  'chainlink',
-];
+export const DEFAULT_COIN_ID = 'bitcoin';
 
 export function formatCurrency(value) {
   if (value == null || Number.isNaN(value)) return '$0.00';

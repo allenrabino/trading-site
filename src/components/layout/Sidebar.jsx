@@ -28,7 +28,7 @@ export default function Sidebar() {
           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
             <TrendingUp className="w-4 h-4 text-primary" />
           </div>
-          <span className="text-lg font-bold tracking-tight">CryptoX</span>
+          <span className="text-lg font-bold tracking-tight">Roket Trading</span>
         </div>
       </div>
 

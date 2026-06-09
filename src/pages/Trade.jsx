@@ -1,67 +1,51 @@
-import React from 'react';
-import { useCryptoById } from '@/hooks/useCryptoPrices';
-import PriceChart from '@/components/trade/PriceChart';
-import TradeForm from '@/components/trade/TradeForm';
-import CoinInfo from '@/components/trade/CoinInfo';
-import LoadingState from '@/components/LoadingState';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { motion } from 'framer-motion';
-
-export default function Trade() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialCoin = urlParams.get('coin') || 'bitcoin';
-  const [selectedCoinId, setSelectedCoinId] = React.useState(initialCoin);
-  const { coins, coin, isLoading, isError, refetch } = useCryptoById(selectedCoinId);
-
-  if (isLoading && !coin) {
-    return <LoadingState message="Loading live prices..." />;
-  }
-
-  if (isError || !coin) {
-    return (
-      <div className="p-6 text-center space-y-3">
-        <p className="text-destructive">Failed to load live market prices.</p>
-        <button onClick={() => refetch()} className="text-sm text-primary hover:underline">
-          Try again
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 lg:p-6 space-y-4">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <h1 className="text-2xl font-bold">Trade</h1>
-        <Select value={selectedCoinId} onValueChange={setSelectedCoinId}>
-          <SelectTrigger className="w-48 bg-secondary/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {coins.map(c => (
-              <SelectItem key={c.id} value={c.id}>
-                <span className="flex items-center gap-2">
-                  <span className="font-medium">{c.symbol}</span>
-                  <span className="text-muted-foreground">{c.name}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4">
-          <CoinInfo coin={coin} />
-          <PriceChart coin={coin} />
-        </div>
-        <div>
-          <TradeForm coin={coin} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import React, { useRef } from 'react';
+import { useCryptoById } from '@/hooks/useCryptoPrices';
+import PriceChart from '@/components/trade/PriceChart';
+import TradeForm from '@/components/trade/TradeForm';
+import LoadingState from '@/components/LoadingState';
+import { motion } from 'framer-motion';
+
+export default function Trade() {
+  const tradeFormRef = useRef(null);
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialCoin = urlParams.get('coin') || 'bitcoin';
+  const [selectedCoinId, setSelectedCoinId] = React.useState(initialCoin);
+  const { coins, coin, isLoading, isError, refetch } = useCryptoById(selectedCoinId);
+
+  const scrollToTrade = () => {
+    tradeFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  if (isLoading && !coin) {
+    return <LoadingState message="Loading live prices..." />;
+  }
+
+  if (isError || !coin) {
+    return (
+      <div className="p-4 text-center space-y-3">
+        <p className="text-destructive">Failed to load live market prices.</p>
+        <button onClick={() => refetch()} className="text-sm text-primary hover:underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+        <PriceChart
+          coin={coin}
+          coins={coins}
+          onCoinChange={setSelectedCoinId}
+          onBuy={scrollToTrade}
+        />
+      </motion.div>
+
+      <div ref={tradeFormRef}>
+        <TradeForm coin={coin} />
+      </div>
+    </div>
+  );
+}
+

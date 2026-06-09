@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
+import { Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 
 export default function Login() {
@@ -29,14 +29,13 @@ export default function Login() {
 
   return (
     <AuthLayout
-      icon={LogIn}
-      title="Welcome back"
+      title="Sign in"
       subtitle="Log in to your account"
       footer={
         <>
-          Don&apos;t have an account?{" "}
+          No account?{" "}
           <Link to="/register" className="text-primary font-medium hover:underline">
-            Create one
+            Register
           </Link>
         </>
       }
@@ -57,10 +56,10 @@ export default function Login() {
               type="email"
               autoComplete="email"
               autoFocus
-              placeholder="you@example.com"
+              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12"
+              className="pl-10 h-11 bg-secondary/50"
               required
             />
           </div>
@@ -78,25 +77,29 @@ export default function Login() {
               id="password"
               type="password"
               autoComplete="current-password"
-              placeholder="••••••••"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12"
+              className="pl-10 h-11 bg-secondary/50"
               required
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" className="w-full h-11 font-medium primary-gradient text-primary-foreground hover:opacity-90" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Logging in...
+              Signing in...
             </>
           ) : (
-            "Log in"
+            "Sign in"
           )}
         </Button>
       </form>
+
+      <p className="text-center text-[10px] text-muted-foreground mt-4 leading-relaxed">
+        Login indicates agreement to Service Terms, Privacy Policy, and Anti Money Laundering Protocol
+      </p>
     </AuthLayout>
   );
 }

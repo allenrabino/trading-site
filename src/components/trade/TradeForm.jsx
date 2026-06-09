@@ -91,7 +91,7 @@ export default function TradeForm({ coin }) {
           onClick={() => { setTradeType('buy'); setAmount(''); }}
           className={cn(
             "flex-1 py-2 text-sm font-medium rounded-md transition-all",
-            tradeType === 'buy' ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+            tradeType === 'buy' ? "bg-primary text-primary-foreground" : "text-muted-foreground"
           )}
         >
           Buy
@@ -154,7 +154,7 @@ export default function TradeForm({ coin }) {
           className={cn(
             "w-full h-11 font-semibold text-sm",
             tradeType === 'buy'
-              ? "bg-accent hover:bg-accent/90 text-accent-foreground"
+              ? "primary-gradient hover:opacity-90 text-primary-foreground"
               : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
           )}
         >
