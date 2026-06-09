@@ -1,6 +1,6 @@
 import { COIN_IDS } from './cryptoData';
 
-const BASE = '/coingecko/api/v3';
+const API_BASE = '/api/crypto';
 
 function buildSparklineHistory(prices) {
   if (!prices?.length) return [];
@@ -30,31 +30,36 @@ function transformMarketCoin(coin) {
   };
 }
 
-export async function fetchCoinMarkets() {
-  const ids = COIN_IDS.join(',');
-  const url = `${BASE}/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`;
+async function parseApiResponse(response, fallbackMessage) {
+  const data = await response.json().catch(() => null);
 
-  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error('Failed to fetch live market prices');
+    throw new Error(data?.error || fallbackMessage);
   }
 
-  const data = await response.json();
+  return data;
+}
+
+export async function fetchCoinMarkets() {
+  const response = await fetch(`${API_BASE}/markets`);
+  const data = await parseApiResponse(response, 'Failed to fetch live market prices');
+
   if (!Array.isArray(data)) {
     throw new Error('Failed to fetch live market prices');
   }
+
   return data.map(transformMarketCoin);
 }
 
 export async function fetchCoinMarketChart(coinId, days) {
-  const url = `${BASE}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
-  const response = await fetch(url);
+  const params = new URLSearchParams({
+    coinId,
+    days: String(days),
+  });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch price history');
-  }
+  const response = await fetch(`${API_BASE}/chart?${params}`);
+  const data = await parseApiResponse(response, 'Failed to fetch price history');
 
-  const data = await response.json();
   return (data.prices ?? []).map(([timestamp, price]) => ({
     time: new Date(timestamp).toISOString(),
     price,
