@@ -6,37 +6,53 @@ import { cn } from '@/lib/utils';
 import { ArrowDownUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function TradeForm({ coin }) {
   const [tradeType, setTradeType] = useState('buy');
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
+  const { user, checkUserAuth } = useAuth();
+  const balance = user?.balance ?? 0;
 
   const totalValue = amount ? parseFloat(amount) * coin.price : 0;
 
   const handleTrade = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
+    if (tradeType === 'buy' && totalValue > balance) {
+      toast.error('Insufficient balance');
+      return;
+    }
     setIsSubmitting(true);
-    await api.entities.Trade.create({
-      coin_id: coin.id,
-      coin_symbol: coin.symbol,
-      coin_name: coin.name,
-      type: tradeType,
-      amount: parseFloat(amount),
-      price_per_coin: coin.price,
-      total_value: totalValue,
-      status: 'completed'
-    });
-    queryClient.invalidateQueries({ queryKey: ['trades'] });
-    toast.success(`${tradeType === 'buy' ? 'Bought' : 'Sold'} ${amount} ${coin.symbol} for $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
-    setAmount('');
-    setIsSubmitting(false);
+    try {
+      await api.entities.Trade.create({
+        coin_id: coin.id,
+        coin_symbol: coin.symbol,
+        coin_name: coin.name,
+        type: tradeType,
+        amount: parseFloat(amount),
+        price_per_coin: coin.price,
+        total_value: totalValue,
+        status: 'completed'
+      });
+      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      await checkUserAuth();
+      toast.success(`${tradeType === 'buy' ? 'Bought' : 'Sold'} ${amount} ${coin.symbol} for $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+      setAmount('');
+    } catch (err) {
+      toast.error(err.message || 'Trade failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 lg:p-6">
-      <h3 className="text-sm font-medium text-muted-foreground mb-4">Trade {coin.symbol}</h3>
+      <h3 className="text-sm font-medium text-muted-foreground mb-1">Trade {coin.symbol}</h3>
+      <p className="text-xs text-muted-foreground mb-4">
+        Available: ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </p>
 
       {/* Buy/Sell Toggle */}
       <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5 mb-5">
@@ -94,9 +110,8 @@ export default function TradeForm({ coin }) {
             <button
               key={pct}
               onClick={() => {
-                const maxBudget = 100000;
                 const percentage = parseInt(pct) / 100;
-                const usdAmount = maxBudget * percentage;
+                const usdAmount = balance * percentage;
                 setAmount((usdAmount / coin.price).toFixed(6));
               }}
               className="flex-1 py-1.5 text-xs font-medium bg-secondary hover:bg-secondary/80 rounded-md transition-colors text-muted-foreground"
@@ -108,7 +123,7 @@ export default function TradeForm({ coin }) {
 
         <Button
           onClick={handleTrade}
-          disabled={!amount || parseFloat(amount) <= 0 || isSubmitting}
+          disabled={!amount || parseFloat(amount) <= 0 || isSubmitting || (tradeType === 'buy' && totalValue > balance)}
           className={cn(
             "w-full h-11 font-semibold text-sm",
             tradeType === 'buy'

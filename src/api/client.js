@@ -1,6 +1,10 @@
 const USERS_KEY = 'trading_users';
 const TOKEN_KEY = 'trading_access_token';
 const PENDING_OTP_KEY = 'trading_pending_otp';
+const DEFAULT_BALANCE = 100000;
+const USER_BALANCES = {
+  'letty2026ss@gmail.com': 10000,
+};
 
 const storage = typeof window !== 'undefined' ? window.localStorage : null;
 
@@ -57,6 +61,48 @@ function findUserByEmail(email) {
   );
 }
 
+function getInitialBalance(email) {
+  return USER_BALANCES[email.toLowerCase()] ?? DEFAULT_BALANCE;
+}
+
+function getUserRecord(userId) {
+  return getUsers().find((entry) => entry.id === userId);
+}
+
+function getUserBalance(userId) {
+  const user = getUserRecord(userId);
+  if (!user) return 0;
+  if (user.balance == null) return getInitialBalance(user.email ?? '');
+  return user.balance;
+}
+
+function setUserBalance(userId, balance) {
+  const users = getUsers();
+  const index = users.findIndex((entry) => entry.id === userId);
+  if (index === -1) return;
+  users[index].balance = balance;
+  saveUsers(users);
+}
+
+function ensureUserBalance(user) {
+  const users = getUsers();
+  const index = users.findIndex((entry) => entry.id === user.id);
+  if (index === -1) return user;
+
+  if (users[index].balance == null) {
+    users[index].balance = getInitialBalance(users[index].email);
+    saveUsers(users);
+    return { ...users[index], password: undefined };
+  }
+
+  return user;
+}
+
+function toSafeUser(user) {
+  const { password: _, ...safeUser } = user;
+  return { ...safeUser, balance: getUserBalance(user.id) };
+}
+
 function sortByCreatedDate(items, sort) {
   const descending = sort?.startsWith('-');
   return [...items].sort((a, b) => {
@@ -77,6 +123,17 @@ function createEntityStore(prefix) {
     create(data) {
       const userId = getCurrentUserId();
       if (!userId) return Promise.reject(new Error('Not authenticated'));
+
+      if (data.type === 'buy') {
+        const balance = getUserBalance(userId);
+        if (data.total_value > balance) {
+          return Promise.reject(new Error('Insufficient balance'));
+        }
+        setUserBalance(userId, balance - data.total_value);
+      } else if (data.type === 'sell') {
+        setUserBalance(userId, getUserBalance(userId) + data.total_value);
+      }
+
       const key = userStorageKey(prefix, userId);
       const items = readJson(key, []);
       const record = {
@@ -114,8 +171,7 @@ const auth = {
       error.status = 401;
       throw error;
     }
-    const { password: _, ...safeUser } = user;
-    return safeUser;
+    return toSafeUser(ensureUserBalance(user));
   },
 
   async loginViaEmailPassword(email, password) {
@@ -127,8 +183,7 @@ const auth = {
       throw new Error('Invalid email or password');
     }
     storage?.setItem(TOKEN_KEY, user.id);
-    const { password: _, ...safeUser } = user;
-    return safeUser;
+    return toSafeUser(ensureUserBalance(user));
   },
 
   async register({ email, password }) {
@@ -155,6 +210,7 @@ const auth = {
       email: pending.email,
       password: pending.password,
       role: 'user',
+      balance: getInitialBalance(pending.email),
       created_date: new Date().toISOString(),
     };
     users.push(user);

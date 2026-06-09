@@ -2,6 +2,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ArrowLeftRight, Wallet, Star, Clock, TrendingUp, PieChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
+import { formatCurrency } from '@/lib/cryptoData';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,6 +17,8 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const { user } = useAuth();
+  const balance = user?.balance ?? 0;
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-card/50 backdrop-blur-xl">
@@ -57,7 +61,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-border">
         <div className="bg-secondary/50 rounded-lg p-3">
           <p className="text-xs text-muted-foreground">Paper Trading Mode</p>
-          <p className="text-sm font-medium text-accent mt-1">$100,000.00 USD</p>
+          <p className="text-sm font-medium text-accent mt-1">{formatCurrency(balance)} USD</p>
         </div>
       </div>
     </aside>
