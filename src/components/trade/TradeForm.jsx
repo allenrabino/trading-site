@@ -8,8 +8,18 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { calculateHoldings, getHoldingAmount, roundValue } from '@/lib/portfolio';
+import TradeCountdown from '@/components/trade/TradeCountdown';
 
-export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess }) {
+export default function TradeForm({
+  coin,
+  defaultTradeType = 'buy',
+  onSuccess,
+  onPhaseChange,
+  onTradeUpdate,
+  refetchPrice,
+}) {
+  const [phase, setPhase] = useState('form');
+  const [contract, setContract] = useState(null);
   const [tradeType, setTradeType] = useState(defaultTradeType);
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,7 +30,13 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
   useEffect(() => {
     setTradeType(defaultTradeType);
     setAmount('');
+    setPhase('form');
+    setContract(null);
   }, [defaultTradeType, coin?.id]);
+
+  useEffect(() => {
+    onPhaseChange?.(phase);
+  }, [phase, onPhaseChange]);
 
   const { data: trades = [] } = useQuery({
     queryKey: ['trades'],
@@ -30,17 +46,44 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
   const holdings = useMemo(() => calculateHoldings(trades), [trades]);
   const coinHolding = getHoldingAmount(holdings, coin.id);
   const parsedAmount = parseFloat(amount) || 0;
+  const refreshTrades = async () => {
+    await queryClient.refetchQueries({ queryKey: ['trades'] });
+    onTradeUpdate?.();
+  };
   const totalValue = roundValue(parsedAmount * coin.price);
 
-  const handleTrade = async () => {
+  const handleTimedBuy = async () => {
     if (!parsedAmount || parsedAmount <= 0) return;
 
-    if (tradeType === 'buy' && totalValue > balance + 0.01) {
+    if (totalValue > balance + 0.01) {
       toast.error('Insufficient balance');
       return;
     }
 
-    if (tradeType === 'sell' && parsedAmount > coinHolding + 0.00000001) {
+    setIsSubmitting(true);
+    try {
+      const activeContract = await api.trading.startTimedBuy({
+        coin_id: coin.id,
+        coin_symbol: coin.symbol,
+        coin_name: coin.name,
+        amount: parsedAmount,
+        entry_price: coin.price,
+      });
+      await checkUserAuth();
+      await refreshTrades();
+      setContract(activeContract);
+      setPhase('countdown');
+    } catch (err) {
+      toast.error(err.message || 'Trade failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleInstantSell = async () => {
+    if (!parsedAmount || parsedAmount <= 0) return;
+
+    if (parsedAmount > coinHolding + 0.00000001) {
       toast.error('Insufficient holdings');
       return;
     }
@@ -51,13 +94,13 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
         coin_id: coin.id,
         coin_symbol: coin.symbol,
         coin_name: coin.name,
-        type: tradeType,
+        type: 'sell',
         amount: parsedAmount,
         price_per_coin: coin.price,
       });
-      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      await refreshTrades();
       await checkUserAuth();
-      toast.success(`${tradeType === 'buy' ? 'Bought' : 'Sold'} ${parsedAmount} ${coin.symbol} for $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+      toast.success(`Sold ${parsedAmount} ${coin.symbol} for $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
       setAmount('');
       onSuccess?.();
     } catch (err) {
@@ -65,6 +108,27 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleTrade = () => {
+    if (tradeType === 'buy') {
+      handleTimedBuy();
+      return;
+    }
+    handleInstantSell();
+  };
+
+  const handleCountdownComplete = async () => {
+    await refreshTrades();
+    await checkUserAuth();
+  };
+
+  const handleCloseResult = async () => {
+    await refreshTrades();
+    setPhase('form');
+    setContract(null);
+    setAmount('');
+    onSuccess?.();
   };
 
   const handleQuickAmount = (percentage) => {
@@ -83,6 +147,18 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
       : parsedAmount <= coinHolding + 0.00000001
   );
 
+  if (phase === 'countdown' && contract) {
+    return (
+      <TradeCountdown
+        contract={contract}
+        coin={coin}
+        refetchPrice={refetchPrice}
+        onComplete={handleCountdownComplete}
+        onClose={handleCloseResult}
+      />
+    );
+  }
+
   return (
     <div>
       <h3 className="text-sm font-medium text-muted-foreground mb-1">Trade {coin.symbol}</h3>
@@ -94,19 +170,21 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
 
       <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5 mb-5">
         <button
+          type="button"
           onClick={() => { setTradeType('buy'); setAmount(''); }}
           className={cn(
-            "flex-1 py-2 text-sm font-medium rounded-md transition-all",
-            tradeType === 'buy' ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+            'flex-1 py-2 text-sm font-medium rounded-md transition-all',
+            tradeType === 'buy' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
           )}
         >
           Buy
         </button>
         <button
+          type="button"
           onClick={() => { setTradeType('sell'); setAmount(''); }}
           className={cn(
-            "flex-1 py-2 text-sm font-medium rounded-md transition-all",
-            tradeType === 'sell' ? "bg-destructive text-destructive-foreground" : "text-muted-foreground"
+            'flex-1 py-2 text-sm font-medium rounded-md transition-all',
+            tradeType === 'sell' ? 'bg-destructive text-destructive-foreground' : 'text-muted-foreground'
           )}
         >
           Sell
@@ -142,10 +220,17 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
           </div>
         </div>
 
+        {tradeType === 'buy' && (
+          <p className="text-[10px] text-muted-foreground text-center">
+            60s countdown starts on buy · profit/loss based on price change
+          </p>
+        )}
+
         <div className="flex items-center gap-2">
           {[25, 50, 75, 100].map(pct => (
             <button
               key={pct}
+              type="button"
               onClick={() => handleQuickAmount(pct)}
               className="flex-1 py-1.5 text-xs font-medium bg-secondary hover:bg-secondary/80 rounded-md transition-colors text-muted-foreground"
             >
@@ -158,10 +243,10 @@ export default function TradeForm({ coin, defaultTradeType = 'buy', onSuccess })
           onClick={handleTrade}
           disabled={!canSubmit}
           className={cn(
-            "w-full h-11 font-semibold text-sm",
+            'w-full h-11 font-semibold text-sm',
             tradeType === 'buy'
-              ? "primary-gradient hover:opacity-90 text-primary-foreground"
-              : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              ? 'primary-gradient hover:opacity-90 text-primary-foreground'
+              : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
           )}
         >
           {isSubmitting ? (

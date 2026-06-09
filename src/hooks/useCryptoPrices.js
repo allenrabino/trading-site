@@ -3,14 +3,17 @@ import { fetchCoinMarkets, fetchCoinMarketChart } from '@/lib/coingecko';
 import { CHART_TIMEFRAMES } from '@/lib/chartUtils';
 import { findCoinById } from '@/lib/cryptoData';
 
-const REFETCH_INTERVAL = 30_000;
+const REFETCH_INTERVAL = 120_000;
 
 export function useCryptoPrices() {
   return useQuery({
     queryKey: ['crypto-prices'],
     queryFn: fetchCoinMarkets,
     refetchInterval: REFETCH_INTERVAL,
-    staleTime: 15_000,
+    staleTime: 90_000,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 10000),
+    placeholderData: (previousData) => previousData,
   });
 }
 

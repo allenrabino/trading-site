@@ -464,9 +464,118 @@ const admin = {
   },
 };
 
+export const TRADE_COUNTDOWN_SECONDS = 60;
+
+const trading = {
+  async startTimedBuy({ coin_id, coin_symbol, coin_name, amount, entry_price }) {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error('Not authenticated');
+
+    const amountRounded = roundAmount(amount);
+    const entryPrice = roundValue(entry_price);
+    const totalValue = roundValue(amountRounded * entryPrice);
+
+    if (totalValue <= 0) throw new Error('Invalid trade amount');
+
+    const balance = getUserBalance(userId);
+    if (totalValue > balance + 0.01) {
+      throw new Error('Insufficient balance');
+    }
+
+    setUserBalance(userId, roundValue(balance - totalValue));
+
+    const contractId = generateId();
+    const tradesKey = userStorageKey('trading_trades', userId);
+    const trades = readJson(tradesKey, []);
+    trades.push({
+      id: contractId,
+      created_date: new Date().toISOString(),
+      coin_id,
+      coin_symbol,
+      coin_name,
+      type: 'buy',
+      amount: amountRounded,
+      price_per_coin: entryPrice,
+      total_value: totalValue,
+      timed: true,
+      duration_sec: TRADE_COUNTDOWN_SECONDS,
+      status: 'pending',
+    });
+    writeJson(tradesKey, trades);
+
+    return {
+      id: contractId,
+      coin_id,
+      coin_symbol,
+      coin_name,
+      amount: amountRounded,
+      entry_price: entryPrice,
+      total_value: totalValue,
+      duration_sec: TRADE_COUNTDOWN_SECONDS,
+      ends_at: Date.now() + TRADE_COUNTDOWN_SECONDS * 1000,
+    };
+  },
+
+  async completeTimedBuy(contract, exit_price) {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error('Not authenticated');
+
+    const exitPrice = roundValue(exit_price);
+    const { entry_price, total_value, amount, coin_id, coin_symbol, coin_name, duration_sec, id: contractId } = contract;
+
+    let pnl = roundValue(total_value * (exitPrice / entry_price - 1));
+    if (pnl < -total_value) pnl = -total_value;
+
+    setUserBalance(userId, roundValue(getUserBalance(userId) + total_value + pnl));
+
+    const tradesKey = userStorageKey('trading_trades', userId);
+    const trades = readJson(tradesKey, []);
+    const completedRecord = {
+      id: contractId ?? generateId(),
+      created_date: new Date().toISOString(),
+      coin_id,
+      coin_symbol,
+      coin_name,
+      type: 'buy',
+      amount,
+      price_per_coin: entry_price,
+      exit_price: exitPrice,
+      total_value,
+      pnl,
+      timed: true,
+      duration_sec,
+      status: 'completed',
+    };
+
+    const existingIndex = trades.findIndex((trade) => trade.id === contractId);
+    if (existingIndex >= 0) {
+      trades[existingIndex] = {
+        ...trades[existingIndex],
+        ...completedRecord,
+        created_date: trades[existingIndex].created_date,
+      };
+    } else {
+      trades.push(completedRecord);
+    }
+    writeJson(tradesKey, trades);
+
+    const changePct = entry_price ? ((exitPrice - entry_price) / entry_price) * 100 : 0;
+
+    return {
+      pnl,
+      exitPrice,
+      isProfit: pnl >= 0,
+      total_value,
+      entry_price,
+      changePct,
+    };
+  },
+};
+
 export const api = {
   auth,
   admin,
+  trading,
   entities: {
     Trade: createEntityStore('trading_trades'),
     Watchlist: createEntityStore('trading_watchlist'),

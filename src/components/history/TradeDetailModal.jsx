@@ -14,12 +14,16 @@ export default function TradeDetailModal({ trade, onClose }) {
   const currentPrice = coinData ? coinData.price : trade.price_per_coin;
   const isBuy = trade.type === 'buy';
 
-  // P&L calculation
-  const profit = isBuy
-    ? (currentPrice - trade.price_per_coin) * trade.amount
-    : (trade.price_per_coin - currentPrice) * trade.amount;
-  const profitPct = ((profit / trade.total_value) * 100).toFixed(2);
+  const profit = trade.pnl != null
+    ? trade.pnl
+    : isBuy
+      ? (currentPrice - trade.price_per_coin) * trade.amount
+      : (trade.price_per_coin - currentPrice) * trade.amount;
+  const profitPct = trade.total_value
+    ? ((profit / trade.total_value) * 100).toFixed(2)
+    : '0.00';
   const isProfit = profit >= 0;
+  const exitPrice = trade.exit_price ?? currentPrice;
 
   // Simulated fee (0.1%)
   const fee = trade.total_value * 0.001;
@@ -71,7 +75,7 @@ export default function TradeDetailModal({ trade, onClose }) {
                 icon: isBuy ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />,
               },
               { label: 'Entry Price', value: formatCurrency(trade.price_per_coin) },
-              { label: 'Current Price', value: formatCurrency(currentPrice) },
+              { label: trade.timed ? 'Exit Price' : 'Current Price', value: formatCurrency(exitPrice) },
               { label: 'Amount', value: `${trade.amount.toFixed(6)} ${trade.coin_symbol}` },
               { label: 'Value', value: `${formatCurrency(trade.total_value)} USDT` },
               { label: 'Fee (0.1%)', value: `${formatCurrency(fee)} USDT` },

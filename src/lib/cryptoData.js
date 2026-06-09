@@ -18,3 +18,12 @@ export function findCoinById(coins, id) {
   const resolvedId = aliases[id] || id;
   return coins.find((coin) => coin.id === resolvedId || coin.id === id);
 }
+
+export function normalizeCoinId(id) {
+  const aliases = { avalanche: 'avalanche-2' };
+  return aliases[id] || id;
+}
+
+export function isSameCoinId(a, b) {
+  return normalizeCoinId(a) === normalizeCoinId(b);
+}

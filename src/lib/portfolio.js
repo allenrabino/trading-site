@@ -15,7 +15,7 @@ export function calculateHoldings(trades) {
   const holdings = {};
 
   trades
-    .filter((trade) => trade.status === 'completed')
+    .filter((trade) => !trade.status || trade.status === 'completed')
     .sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
     .forEach((trade) => {
       if (!holdings[trade.coin_id]) {

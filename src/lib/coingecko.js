@@ -1,4 +1,29 @@
 const API_BASE = '/api/crypto';
+const MARKETS_CACHE_KEY = 'trading_markets_cache_v1';
+
+function readMarketsCache() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(MARKETS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.data?.length ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeMarketsCache(data) {
+  if (typeof window === 'undefined' || !data?.length) return;
+  try {
+    localStorage.setItem(
+      MARKETS_CACHE_KEY,
+      JSON.stringify({ data, fetchedAt: Date.now() })
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
 
 function buildSparklineHistory(prices) {
   if (!prices?.length) return [];
@@ -39,14 +64,24 @@ async function parseApiResponse(response, fallbackMessage) {
 }
 
 export async function fetchCoinMarkets() {
-  const response = await fetch(`${API_BASE}/markets`);
-  const data = await parseApiResponse(response, 'Failed to fetch live market prices');
+  try {
+    const response = await fetch(`${API_BASE}/markets`);
+    const data = await parseApiResponse(response, 'Failed to fetch live market prices');
 
-  if (!Array.isArray(data)) {
-    throw new Error('Failed to fetch live market prices');
+    if (!Array.isArray(data)) {
+      throw new Error('Failed to fetch live market prices');
+    }
+
+    const transformed = data.map(transformMarketCoin);
+    writeMarketsCache(transformed);
+    return transformed;
+  } catch (error) {
+    const cached = readMarketsCache();
+    if (cached?.length) {
+      return cached;
+    }
+    throw error;
   }
-
-  return data.map(transformMarketCoin);
 }
 
 export async function fetchCoinMarketChart(coinId, days) {
